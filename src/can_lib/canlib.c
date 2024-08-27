@@ -3,7 +3,7 @@
 
 // Initialize CAN interface
 int can_init(const char *ifname) {
-    int s;
+    int s = 0;
     struct sockaddr_can addr;
     struct ifreq ifr;
 
