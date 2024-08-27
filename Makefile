@@ -28,9 +28,9 @@ compile: main
 main: $(cli.c) 
 	$(CC) $(C_FLAGS) $(C_EXFLAGS) $(DEBUG) $(OBJ_LIST) main.c $(cli.c) $(can_lib.c) -o main
 
-dps_clean:
-ifeq ($(wildcard cli.o), cli.o)
-	rm cli.o
+cli_clean:
+ifeq ($(wildcard main), main)
+	rm main
 endif
 
-clean: dps_clean
+clean: cli_clean
