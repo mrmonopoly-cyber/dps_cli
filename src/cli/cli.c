@@ -45,6 +45,12 @@ static int parser(){
             break;
         case 'b':
             printf("list boards\n");
+            board_list_info *boards = dps_master_list_board();
+            for (uint8_t i; i<boards->board_num; i++) {
+                printf("board name: %s, board id: %d\n",
+                        boards->boards[i].name,
+                        boards->boards[i].id);
+            }
             break;
         case 'v':
             printf("list vars\n");
@@ -57,6 +63,16 @@ static int parser(){
                 break;
             }
             for (uint8_t i =0; i<vars->board_num; i++) {           
+                printf("board name: %s, var id: %d, floated: %d,signed :%d,value: ",
+                        vars->vars[i].name,
+                        vars->vars[i].metadata.full_data.obj_id.data_id,
+                        vars->vars[i].metadata.full_data.float_num,
+                        vars->vars[i].metadata.full_data.signe_num);
+                if (vars->vars[i].metadata.full_data.float_num) {
+                    printf("%f\n",(float) vars->vars[i].value[0]);
+                }else {
+                    printf("%d\n",(int) vars->vars[i].value[0]);
+                }
             }
             break;
         case 'c':
@@ -75,6 +91,7 @@ static int parser(){
             printf("v: list vars\n");
             printf("c: list coms\n");
             printf("s: send mex (update var, command)\n");
+            printf("s: quit\n");
             break;
     }
     return EXIT_SUCCESS;
