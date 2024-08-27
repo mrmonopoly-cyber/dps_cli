@@ -1,0 +1,4 @@
+[submodule "lib/DPS"]
+	path = lib/DPS
+	url = https://github.com/mrmonopoly-cyber/DPS.git
+	branch = 2.0
