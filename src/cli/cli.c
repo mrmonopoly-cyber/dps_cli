@@ -26,11 +26,23 @@ static int get_board_input(){
 }
 
 static int get_var_input(){
-    int8_t var_id = -1;
+    int var_id = -1;
     printf("var id [digit]: ");
     fflush(stdin);
     fflush(stdout);
-    scanf("%s\n",&var_id);
+    fscanf(stdin,"%d",&var_id);
+    fflush(stdin);
+    fflush(stdout);
+
+    return var_id;
+}
+
+static int get_com_input(){
+    int var_id = -1;
+    printf("com id [digit]: ");
+    fflush(stdin);
+    fflush(stdout);
+    fscanf(stdin,"%d",&var_id);
     fflush(stdin);
     fflush(stdout);
 
@@ -117,10 +129,13 @@ static int send_req_slave(){
     uint8_t c = 1;
 
     while (c) {
+        getchar();
         printf("v: var category\n");
         printf("c: command category\n");
         printf("b: back\n");
         buffer = getchar();
+        fflush(stdin);
+        fflush(stdout);
         switch (buffer) {
             case 'v':
                 board_id = get_board_input();
@@ -136,9 +151,16 @@ static int send_req_slave(){
                 }
                 uint8_t c1 = 1;
                 var_list_info *vars = NULL;
+                var_record var = {};
+                com_info com = {};
+                if(dps_master_get_value_var(board_id, var_id, &var)){
+                    printf("variable not found %d\n",var_id);
+                    c1 =0;
+                }
                 while (c1) {
-                    printf("u: var category\n");
-                    printf("c: command category\n");
+                    getchar();
+                    printf("u: update var\n");
+                    printf("f: fetch var value\n");
                     printf("b: back\n");
                     buffer = getchar();
                     char value[1024] = {};
@@ -146,12 +168,26 @@ static int send_req_slave(){
                         case 'u':
                             printf("insert the new value[max 1024]: ");
                             fflush(stdin);
-                            scanf("%s\n",value);
+
+                            if(var.metadata.full_data.float_num) {
+                               scanf("%f",(float *)value);
+                            }else{
+                               scanf("%d",(int *) value);
+                            }
                             fflush(stdin);
                             fflush(stdout);
-                            dps_master_update_var(board_id, var_id, value, sizeof(value));
+                            dps_master_update_var(board_id, var_id, value, var.metadata.full_data.size);
+                            dps_master_refresh_value_var(board_id, var_id);
                             break;
-                        case 'c':
+                        case 'f':
+                            dps_master_get_value_var(board_id, var_id, &var);
+                            printf("%s = ",var.name);
+                            if (var.metadata.full_data.float_num) {
+                                float *d =(float *) var.value;
+                                printf("%f\n",*d);
+                            }else {
+                                printf("%d\n",(int) var.value[0]);
+                            }
                             break;
                         case 'b':
                             c1=0;
@@ -160,6 +196,55 @@ static int send_req_slave(){
                 }
                 break;
             case 'c':
+                c1 = 1;
+                var_id = get_com_input();
+                if (dps_master_get_command_info(var_id, &com)) {
+                    printf("command not found\n");
+                    c1=0;
+                }
+                if (var_id < 0) {
+                    printf("invalid com id\n");
+                    break;
+                }
+                while (c1) {
+                    getchar();
+                    printf("f: write the full payload in decimal\n");
+                    printf("s: write the single bytes one by one\n");
+                    printf("b: back\n");
+                    buffer = getchar();
+                    char value[1024] = {};
+                    switch (buffer) {
+                        case 'f':
+                            printf("insert the new value[max 1024]: ");
+                            fflush(stdout);
+                            fflush(stdin);
+                            scanf("%d",(int *)value);
+                            fflush(stdin);
+                            fflush(stdout);
+                            if(dps_master_send_command(var_id, value, com.metadata.full_data.size)){
+                                printf("failed send command\n");
+                            }
+                            break;
+                        case 's':
+                            for (int i =0; i<com.metadata.full_data.size; i++) {
+                                getchar();
+                                printf("insert the byte in pos %d: ",i);
+                                fflush(stdout);
+                                fflush(stdin);
+                                scanf("%c",&value[i]);
+                                fflush(stdin);
+                                fflush(stdout);
+                            }
+                            if(dps_master_send_command(var_id, value, com.metadata.full_data.size)){
+                                printf("failed send command\n");
+                            }
+                            break;
+                        case 'b':
+                            c1=0;
+                            break;
+                    }
+                
+                }
                 break;
             case 'b':
                 c = 0;
@@ -172,12 +257,16 @@ static int send_req_slave(){
 static int parser(){
     char buffer = ' ';
     int8_t board_id = -1;
+    getchar();
+    printf("(press h for help): ");
+    fflush(stdin);
+    fflush(stdout);
     buffer  = getchar();
     fflush(stdin);
     fflush(stdout);
     switch (buffer) {
         case 'n':
-            printf("new connection\n");
+            printf("new connections\n");
             if (dps_master_new_connection()) {
                 return -1;
             }
@@ -221,7 +310,7 @@ static int parser(){
         case 'q':
             printf("quit\n");
             return 1;
-        default:
+        case 'h':
             printf("n: scan boards\n");
             printf("u: update info boards (one or all)\n");
             printf("b: list boards\n");
@@ -229,6 +318,8 @@ static int parser(){
             printf("c: list coms\n");
             printf("s: send mex (update var, command)\n");
             printf("q: quit\n");
+            break;
+        default:
             break;
     }
     return EXIT_SUCCESS;
@@ -241,11 +332,11 @@ static int send_mex(CanMessage *mex){
     };
 
     memcpy(frame.data, mex->rawMex.raw_buffer, mex->dlc);
-    fprintf(stderr, "sending mex: id: %d, dlc: %d, data: ", frame.can_id,frame.can_dlc);
-    for (int i =0; i<frame.can_dlc; i++) {
-        fprintf(stderr, "%d,", frame.data[i]);
-    }
-    fprintf(stderr, "\n");
+    // fprintf(stderr, "sending mex: id: %d, dlc: %d, data: ", frame.can_id,frame.can_dlc);
+    // for (int i =0; i<frame.can_dlc; i++) {
+    //     fprintf(stderr, "%d,", frame.data[i]);
+    // }
+    // fprintf(stderr, "\n");
     return can_send_frame(socket_can, &frame);
 }
 
@@ -260,11 +351,11 @@ static int check_input_mex(void* args){
         mex.dlc = frame.can_dlc;
         memcpy(mex.rawMex.raw_buffer, frame.data, frame.can_dlc);
 
-        fprintf(stderr, "received mex: id: %d, dlc: %d, data: ", frame.can_id,frame.can_dlc);
-        for (int i =0; i<frame.can_dlc; i++) {
-            fprintf(stderr, "%d,", frame.data[i]);
-        }
-        fprintf(stderr, "\n");
+        // fprintf(stderr, "received mex: id: %d, dlc: %d, data: ", frame.can_id,frame.can_dlc);
+        // for (int i =0; i<frame.can_dlc; i++) {
+        //     fprintf(stderr, "%d,", frame.data[i]);
+        // }
+        // fprintf(stderr, "\n");
         dps_master_check_mex_recv(&mex);
     }
 }
