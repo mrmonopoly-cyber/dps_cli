@@ -50,8 +50,8 @@ int can_recv_frame(int socket, struct can_frame *frame) {
     int nbytes;
 
     nbytes = read(socket, frame, sizeof(*frame));
-    if (nbytes != sizeof(struct can_frame)) {
-        perror("Read");
+    if (nbytes < sizeof(*frame)) {
+        perror("read : incomplete CAN frame");
         return -1;
     }
 

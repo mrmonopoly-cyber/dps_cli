@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
+#include <unistd.h>
 
 
 //private
@@ -13,21 +14,167 @@
 static int socket_can=0;
 
 static int get_board_input(){
-    int8_t board_id = -1;
+    int board_id = -1;
     printf("board id [digit]: ");
     fflush(stdin);
     fflush(stdout);
-    scanf("%s\n",&board_id);
+    fscanf(stdin, "%d", &board_id); 
     fflush(stdin);
     fflush(stdout);
 
     return board_id;
 }
 
+static int get_var_input(){
+    int8_t var_id = -1;
+    printf("var id [digit]: ");
+    fflush(stdin);
+    fflush(stdout);
+    scanf("%s\n",&var_id);
+    fflush(stdin);
+    fflush(stdout);
+
+    return var_id;
+}
+
+enum PRINT_INFO
+{
+    P_BOARD,
+    P_VAR,
+    P_COMMAND,
+};
+static int print_info(enum PRINT_INFO type){
+    if (type == P_BOARD) {
+    }
+    board_list_info *boards = NULL;
+    var_list_info* vars = NULL;
+    com_list_info* coms= NULL;
+    uint8_t board_id = -1;
+
+    switch (type) {
+        case P_BOARD:
+            boards = dps_master_list_board();
+            for (uint8_t i=0; i<boards->board_num; i++) {
+                printf("board name: %s, board id: %d\n",
+                        boards->boards[i].name,
+                        boards->boards[i].id);
+            }
+            free(boards);
+            return EXIT_SUCCESS;
+            break;
+        case P_VAR:
+            board_id = get_board_input();
+            if (board_id < 0) {
+                return -1;
+            }
+            if(dps_master_list_vars(board_id, &vars)){
+                return -1;
+            }
+            for (uint8_t i =0; i<vars->board_num; i++) {           
+                printf("var name: %s, var id: %d, size: %d, floated: %d,signed :%d,value: ",
+                        vars->vars[i].name,
+                        vars->vars[i].metadata.full_data.obj_id.data_id,
+                        vars->vars[i].metadata.full_data.size,
+                        vars->vars[i].metadata.full_data.float_num,
+                        vars->vars[i].metadata.full_data.signe_num);
+                if (vars->vars[i].metadata.full_data.float_num) {
+                    float *d =(float *) vars->vars[i].value;
+                    printf("%f\n",*d);
+                }else {
+                    printf("%d\n",(int) vars->vars[i].value[0]);
+                }
+            }
+            free(vars);
+            vars = NULL;
+            break;
+        case P_COMMAND:
+            if(dps_master_list_coms(&coms)){
+                return -1;
+            }
+            for (uint8_t i =0; i<coms->board_num; i++) {
+                printf("com name: %s, com id: %d,size: %d, floated: %d,signed :%d\n",
+                        coms->coms[i].name,
+                        coms->coms[i].metadata.full_data.com_id,
+                        coms->coms[i].metadata.full_data.size,
+                        coms->coms[i].metadata.full_data.float_num,
+                        coms->coms[i].metadata.full_data.signe_num);
+            }
+            free(coms);
+            coms = NULL;
+            break;
+        default:
+            break;
+    }
+
+    return 0;
+}
+
+static int send_req_slave(){
+    char buffer = ' ';
+    uint8_t board_id = -1;
+    uint8_t var_id = -1;
+    uint8_t com_id = -1;
+    uint8_t c = 1;
+
+    while (c) {
+        printf("v: var category\n");
+        printf("c: command category\n");
+        printf("b: back\n");
+        buffer = getchar();
+        switch (buffer) {
+            case 'v':
+                board_id = get_board_input();
+                if (board_id < 0) {
+                    printf("invalid board id\n");
+                    break;
+                }
+
+                var_id = get_var_input();
+                if (var_id < 0) {
+                    printf("invalid var id\n");
+                    break;
+                }
+                uint8_t c1 = 1;
+                var_list_info *vars = NULL;
+                while (c1) {
+                    printf("u: var category\n");
+                    printf("c: command category\n");
+                    printf("b: back\n");
+                    buffer = getchar();
+                    char value[1024] = {};
+                    switch (buffer) {
+                        case 'u':
+                            printf("insert the new value[max 1024]: ");
+                            fflush(stdin);
+                            scanf("%s\n",value);
+                            fflush(stdin);
+                            fflush(stdout);
+                            dps_master_update_var(board_id, var_id, value, sizeof(value));
+                            break;
+                        case 'c':
+                            break;
+                        case 'b':
+                            c1=0;
+                            break;
+                    }
+                }
+                break;
+            case 'c':
+                break;
+            case 'b':
+                c = 0;
+                break;
+        }
+    }
+    return 0;
+}
+
 static int parser(){
     char buffer = ' ';
     int8_t board_id = -1;
     buffer  = getchar();
+    fflush(stdin);
+    fflush(stdout);
     switch (buffer) {
         case 'n':
             printf("new connection\n");
@@ -41,45 +188,35 @@ static int parser(){
             if (board_id < 0) {
                 break;
             }
-            dps_master_refresh_value_var_all(board_id);
+            printf("request info board: %d\n",board_id);
+            if(dps_master_request_info_board(board_id,REQ_VAR | REQ_COM)){
+                printf("failed fetching data from board %d\n",board_id);
+                return -1;
+            }
             break;
         case 'b':
             printf("list boards\n");
-            board_list_info *boards = dps_master_list_board();
-            for (uint8_t i; i<boards->board_num; i++) {
-                printf("board name: %s, board id: %d\n",
-                        boards->boards[i].name,
-                        boards->boards[i].id);
+            if(print_info(P_BOARD)){
+                return -1;
             }
             break;
         case 'v':
             printf("list vars\n");
-            board_id = get_board_input();
-            if (board_id < 0) {
-                break;
-            }
-            var_list_info* vars = NULL;
-            if(dps_master_list_vars(board_id, &vars)){
-                break;
-            }
-            for (uint8_t i =0; i<vars->board_num; i++) {           
-                printf("board name: %s, var id: %d, floated: %d,signed :%d,value: ",
-                        vars->vars[i].name,
-                        vars->vars[i].metadata.full_data.obj_id.data_id,
-                        vars->vars[i].metadata.full_data.float_num,
-                        vars->vars[i].metadata.full_data.signe_num);
-                if (vars->vars[i].metadata.full_data.float_num) {
-                    printf("%f\n",(float) vars->vars[i].value[0]);
-                }else {
-                    printf("%d\n",(int) vars->vars[i].value[0]);
-                }
+            if(print_info(P_VAR)){
+                return -1;
             }
             break;
         case 'c':
             printf("list coms\n");
+            if(print_info(P_COMMAND)){
+                return -1;
+            }
             break;
         case 's':
             printf("send\n");
+            if(send_req_slave()){
+                return -1;
+            }
             break;
         case 'q':
             printf("quit\n");
@@ -91,26 +228,43 @@ static int parser(){
             printf("v: list vars\n");
             printf("c: list coms\n");
             printf("s: send mex (update var, command)\n");
-            printf("s: quit\n");
+            printf("q: quit\n");
             break;
     }
     return EXIT_SUCCESS;
 }
 
 static int send_mex(CanMessage *mex){
-    return 0;
+    struct can_frame frame = {
+        .can_id = mex->id,
+        .can_dlc = mex->dlc,
+    };
+
+    memcpy(frame.data, mex->rawMex.raw_buffer, mex->dlc);
+    fprintf(stderr, "sending mex: id: %d, dlc: %d, data: ", frame.can_id,frame.can_dlc);
+    for (int i =0; i<frame.can_dlc; i++) {
+        fprintf(stderr, "%d,", frame.data[i]);
+    }
+    fprintf(stderr, "\n");
+    return can_send_frame(socket_can, &frame);
 }
 
 static int check_input_mex(void* args){
-    struct can_frame* frame;
+    struct can_frame frame = {};
     CanMessage mex;
     while (1) {
-        if(can_recv_frame(socket_can, frame)){
+        if(can_recv_frame(socket_can, &frame)){
             continue;
         }
-        mex.id = frame->can_id;
-        mex.dlc = frame->can_dlc;
-        memcpy(mex.rawMex.raw_buffer, frame->data, frame->can_dlc);
+        mex.id = frame.can_id;
+        mex.dlc = frame.can_dlc;
+        memcpy(mex.rawMex.raw_buffer, frame.data, frame.can_dlc);
+
+        fprintf(stderr, "received mex: id: %d, dlc: %d, data: ", frame.can_id,frame.can_dlc);
+        for (int i =0; i<frame.can_dlc; i++) {
+            fprintf(stderr, "%d,", frame.data[i]);
+        }
+        fprintf(stderr, "\n");
         dps_master_check_mex_recv(&mex);
     }
 }
@@ -118,6 +272,16 @@ static int check_input_mex(void* args){
 //public
 int cli_init()
 {
+    char can_interface[1024] = {};
+    printf("insert the name of the interface [max 1024]:");
+    fflush(stdin);
+    fscanf(stdin, "%s", can_interface);
+    fflush(stdin);
+    socket_can = can_init(can_interface);
+    if (!socket_can) {
+        fprintf(stderr, "failed init can interface: %s\n",can_interface);
+        return EXIT_FAILURE;
+    }
     if (dps_master_init(send_mex)) {
         return EXIT_FAILURE;
     }
@@ -125,19 +289,6 @@ int cli_init()
 }
 int cli_start()
 {
-    {
-        char can_interface[1024] = {};
-        printf("insert the name of the interface [max 1024]:");
-        fflush(stdin);
-        fscanf(stdin, "%s", can_interface);
-        fflush(stdin);
-        socket_can = can_init(can_interface);
-        if (!socket_can) {
-            fprintf(stderr, "failed init can interface: %s\n",can_interface);
-            return EXIT_FAILURE;
-        }
-    }
-
     thrd_t in_mex = 0;
     thrd_create(&in_mex, check_input_mex, NULL);
 
