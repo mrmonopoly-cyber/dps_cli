@@ -14,7 +14,7 @@ all: release
 
 DEBUG_FLAGS = -O0 -fsanitize=address -g
 RELEASE_FLAGS = -O2
-OBJ_LIST = c_check_input.o c_vector.o dps_master.o dps_slave.o
+OBJ_LIST = c_vector.o dps_master.o dps_slave.o
 
 debug: C_FLAGS += $(DEBUG_FLAGS)
 debug: compile
