@@ -327,7 +327,7 @@ static int send_mex(CanMessage *mex) {
       .can_dlc = mex->dlc,
   };
 
-  memcpy(frame.data, mex->rawMex.raw_buffer, mex->dlc);
+  memcpy(frame.data, mex->GenericPayload.rawMex.raw_buffer, mex->dlc);
   // fprintf(stderr, "sending mex: id: %d, dlc: %d, data: ",
   // frame.can_id,frame.can_dlc); for (int i =0; i<frame.can_dlc; i++) {
   //     fprintf(stderr, "%d,", frame.data[i]);
@@ -345,7 +345,7 @@ static int check_input_mex(void *args) {
     }
     mex.id = frame.can_id;
     mex.dlc = frame.can_dlc;
-    memcpy(mex.rawMex.raw_buffer, frame.data, frame.can_dlc);
+    memcpy(mex.GenericPayload.rawMex.raw_buffer, frame.data, frame.can_dlc);
 
     // fprintf(stderr, "received mex: id: %d, dlc: %d, data: ",
     // frame.can_id,frame.can_dlc); for (int i =0; i<frame.can_dlc; i++) {
