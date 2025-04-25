@@ -5,15 +5,19 @@
 
 int main(void)
 {
-    if (cli_init()) {
-        fprintf(stderr,"failed init cli\n");
-        return -1;
-    }
+  Cli_h cli ={0};
 
-    if (cli_start()) {
-        fprintf(stderr,"cli crushed\n");
-        return -2;
-    }
+  if (cli_init(&cli))
+  {
+    fprintf(stderr,"failed init cli\n");
+    return -1;
+  }
 
-    return EXIT_SUCCESS;
+  if (cli_start(&cli))
+  {
+    fprintf(stderr,"cli crushed\n");
+    return -2;
+  }
+
+  return EXIT_SUCCESS;
 }

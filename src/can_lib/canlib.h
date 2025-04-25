@@ -11,9 +11,9 @@
 #include <stdlib.h>
 
 // Function prototypes
-int can_init(const char *ifname);
-int can_send_frame(int socket, struct can_frame *frame);
-int can_recv_frame(int socket, struct can_frame *frame);
+int8_t can_init(const char *ifname);
+int8_t can_send_frame(int socket, struct can_frame *frame);
+int8_t can_recv_frame(int socket, struct can_frame *frame);
 
 #endif // CANLIB_H
 

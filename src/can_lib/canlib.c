@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 // Initialize CAN interface
-int can_init(const char *ifname) {
+int8_t can_init(const char *ifname) {
   int s = 0;
   struct sockaddr_can addr;
   struct ifreq ifr;
@@ -33,7 +33,7 @@ int can_init(const char *ifname) {
 }
 
 // Send a CAN frame
-int can_send_frame(int socket, struct can_frame *frame) {
+int8_t can_send_frame(int socket, struct can_frame *frame) {
   int nbytes;
 
   nbytes = write(socket, frame, sizeof(struct can_frame));
@@ -46,7 +46,7 @@ int can_send_frame(int socket, struct can_frame *frame) {
 }
 
 // Receive a CAN frame
-int can_recv_frame(int socket, struct can_frame *frame) {
+int8_t can_recv_frame(int socket, struct can_frame *frame) {
   long unsigned int nbytes;
 
   nbytes = read(socket, frame, sizeof(*frame));
