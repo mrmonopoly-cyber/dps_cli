@@ -69,6 +69,10 @@ static int _print_info(struct Cli_t* const restrict self, enum PRINT_INFO type) 
   switch (type) {
   case P_BOARD:
     boards = dps_master_list_board(&self->m_master);
+    if (!boards)
+    {
+      break;
+    }
     for (uint8_t i = 0; i < boards->board_num; i++) {
       printf("board name: %s, board id: %d\n", boards->boards[i].name,
              boards->boards[i].id);
@@ -204,6 +208,9 @@ static int _send_req_slave(struct Cli_t* const restrict self)
 
           break;
         case 'f':
+          dps_master_update_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id, value, size);
+          dps_master_refresh_value_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id);
+          sleep(1);
           dps_master_get_value_var(&self->m_master,(uint8_t) board_id, (uint8_t) var_id, &var);
           printf("%s = ", var.name);
           if (var.type == DATA_FLOATED)
@@ -304,6 +311,7 @@ static int8_t send_mex(const DpsCanMessage* const restrict mex) {
       .can_dlc = mex->dlc,
   };
 
+  printf("sendind mex with id: %d\n",mex->id);
   memcpy(frame.data, &mex->full_word, mex->dlc);
 
   return can_send_frame(SOCKET_CAN, &frame);
@@ -360,7 +368,10 @@ int8_t cli_init(Cli_h* const self)
   fscanf(stdin, "%d", &slaves_id);
   fflush(stdin);
 
-  if (dps_master_init(&p_self->m_master, (uint8_t) master_id, (uint8_t) slaves_id, send_mex))
+  printf("using master id: %d\n", master_id);
+  printf("using slaves id: %d\n", slaves_id);
+
+  if (dps_master_init(&p_self->m_master, (uint16_t) master_id, (uint16_t) slaves_id, send_mex))
   {
     return -2;
   }

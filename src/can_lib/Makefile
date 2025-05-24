@@ -1,4 +1,4 @@
-C_FLAGS =-Wall -Wextra  -fsanitize=address -g
+C_FLAGS =-Wall -Wextra  -fsanitize=undefined,address -g
 
 canlib_src_path := $(or $(CANLIB_ROOT), .)
 canlib.c := $(canlib_src_path)/canlib.c

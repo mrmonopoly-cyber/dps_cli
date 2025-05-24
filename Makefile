@@ -1,7 +1,7 @@
 CC = gcc
 C_FLAGS = -Wall -Wextra
 C_EXFLAGS = 
-DEBUG_FLAGS = -Werror -O0 -DDEBUG -fsanitize=undefine,address -g
+DEBUG_FLAGS = -Werror -O0 -DDEBUG -fsanitize=undefined,address -g
 RELEASE_FLAGS = -O2 -Werror
 
 cli_src_path := $(or $(CLI_ROOT), .)
