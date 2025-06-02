@@ -239,7 +239,6 @@ static int _parser(struct Cli_t* const restrict self)
 {
   int buffer = ' ';
   int board_id = -1;
-  getchar();
   printf("(press h for help): ");
   fflush(stdin);
   fflush(stdout);
@@ -302,6 +301,7 @@ static int _parser(struct Cli_t* const restrict self)
   default:
     break;
   }
+  getchar();
   return 0;
 }
 
@@ -311,7 +311,6 @@ static int8_t send_mex(const DpsCanMessage* const restrict mex) {
       .can_dlc = mex->dlc,
   };
 
-  printf("sendind mex with id: %d\n",mex->id);
   memcpy(frame.data, &mex->full_word, mex->dlc);
 
   return can_send_frame(SOCKET_CAN, &frame);
@@ -337,41 +336,25 @@ static int check_input_mex(void *args) {
 }
 
 // public
-int8_t cli_init(Cli_h* const self)
+int8_t cli_init(Cli_h* const self, const char* const restrict can_node,
+    const uint16_t master_id, const uint16_t slaves_id)
 {
   union Cli_h_t_conv conv = {self};
   struct Cli_t* const p_self = conv.clear;
 
   memset(p_self, 0, sizeof(*p_self));
 
-  char can_interface[1024] = {};
-  uint32_t master_id=0;
-  uint32_t slaves_id=0;
-
-  printf("insert the name of the interface [max 1024]:");
-  fflush(stdin);
-  fscanf(stdin, "%s", can_interface);
-  fflush(stdin);
-  SOCKET_CAN = can_init(can_interface);
+  SOCKET_CAN = can_init(can_node);
   if (SOCKET_CAN < 0)
   {
-    fprintf(stderr, "failed init can interface: %s\n", can_interface);
+    fprintf(stderr, "failed init can interface: %s\n", can_node);
     return -1;
   }
-  printf("insert the id of the master:");
-  fflush(stdin);
-  fscanf(stdin, "%d", &master_id);
-  fflush(stdin);
-
-  printf("insert the id of the slaves:");
-  fflush(stdin);
-  fscanf(stdin, "%d", &slaves_id);
-  fflush(stdin);
-
+  printf("using can node: %s\n", can_node);
   printf("using master id: %d\n", master_id);
   printf("using slaves id: %d\n", slaves_id);
 
-  if (dps_master_init(&p_self->m_master, (uint16_t) master_id, (uint16_t) slaves_id, send_mex))
+  if (dps_master_init(&p_self->m_master, master_id, slaves_id, send_mex))
   {
     return -2;
   }
