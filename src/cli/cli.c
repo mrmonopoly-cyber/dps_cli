@@ -116,10 +116,10 @@ static int _print_info(struct Cli_t* const restrict self, enum PRINT_INFO type) 
 
       if (vars->vars[i].type == DATA_FLOATED)
       {
-        float d = (float )vars->vars[i].value;
+        float d = (float )vars->vars[i].v_float;
         printf("%f\n", d);
       } else {
-        printf("%d\n", vars->vars[i].value);
+        printf("%d\n", vars->vars[i].v_u32);
       }
     }
     free(vars);
@@ -161,14 +161,14 @@ static int _send_req_slave(struct Cli_t* const restrict self)
         break;
       }
       uint8_t c1 = 1;
-      VarRecord var = {};
-      if (dps_master_get_value_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id, &var))
+      VarRecord var = {0};
+      if (dps_master_get_value_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id, &var)<0)
       {
         printf("variable not found %d\n", var_id);
         c1 = 0;
       }
       while (c1) {
-        char value[1024] = {};
+        char value[1024] = {0};
         uint8_t size =0;
 
         getchar();
@@ -215,10 +215,10 @@ static int _send_req_slave(struct Cli_t* const restrict self)
           printf("%s = ", var.name);
           if (var.type == DATA_FLOATED)
           {
-            float d = (float )var.value;
+            float d = (float )var.v_float;
             printf("%f\n", d);
           } else {
-            printf("%d\n", var.value);
+            printf("%d\n", var.v_u32);
           }
           break;
         case 'b':
