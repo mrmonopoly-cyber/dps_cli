@@ -116,7 +116,7 @@ static int _print_info(struct Cli_t* const restrict self, enum PRINT_INFO type) 
 
       if (vars->vars[i].type == DATA_FLOATED)
       {
-        float d = (float )vars->vars[i].v_float;
+        float d = vars->vars[i].v_float;
         printf("%f\n", d);
       } else {
         printf("%d\n", vars->vars[i].v_u32);
@@ -138,6 +138,7 @@ static int _send_req_slave(struct Cli_t* const restrict self)
   int board_id = -1;
   int var_id = -1;
   uint8_t c = 1;
+  int8_t err=0;
 
   while (c) {
     getchar();
@@ -168,7 +169,11 @@ static int _send_req_slave(struct Cli_t* const restrict self)
         c1 = 0;
       }
       while (c1) {
-        char value[1024] = {0};
+        union{
+          uint64_t u64;
+          int64_t i64;
+          float f32;
+        }value;
         uint8_t size =0;
 
         getchar();
@@ -182,12 +187,18 @@ static int _send_req_slave(struct Cli_t* const restrict self)
           printf("insert the new value[max 1024]: ");
           fflush(stdin);
 
-          if (var.type == DATA_FLOATED)
-          {
-            scanf("%f", (float *)value);
-          } else {
-            scanf("%d", (int *)value);
+          switch (var.type) {
+          case DATA_UNSIGNED:
+            scanf("%lu", &value.u64);
+            break;
+          case DATA_SIGNED:
+            scanf("%ld", &value.i64);
+            break;
+          case DATA_FLOATED:
+            scanf("%f", &value.f32);
+            break;
           }
+
           fflush(stdin);
           fflush(stdout);
 
@@ -203,19 +214,25 @@ static int _send_req_slave(struct Cli_t* const restrict self)
               size = 4;
           }
 
-          dps_master_update_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id, value, size);
+          printf("sending b: %d\n",(uint8_t)board_id);
+          printf("sending v: %d\n",(uint8_t)var_id);
+          printf("sending val: %f\n",value.f32);
+
+          if((err=dps_master_update_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id, &value, size))<0)
+          {
+            printf("err sending udpate req: %d\n",err);
+          }
           dps_master_refresh_value_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id);
 
           break;
         case 'f':
-          dps_master_update_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id, value, size);
           dps_master_refresh_value_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id);
-          sleep(1);
+          sleep(2);
           dps_master_get_value_var(&self->m_master,(uint8_t) board_id, (uint8_t) var_id, &var);
           printf("%s = ", var.name);
           if (var.type == DATA_FLOATED)
           {
-            float d = (float )var.v_float;
+            float d = var.v_float;
             printf("%f\n", d);
           } else {
             printf("%d\n", var.v_u32);
@@ -306,6 +323,7 @@ static int _parser(struct Cli_t* const restrict self)
 }
 
 static int8_t send_mex(const DpsCanMessage* const restrict mex) {
+  int8_t err=0;
   struct can_frame frame = {
       .can_id = mex->id,
       .can_dlc = mex->dlc,
@@ -313,7 +331,11 @@ static int8_t send_mex(const DpsCanMessage* const restrict mex) {
 
   memcpy(frame.data, &mex->full_word, mex->dlc);
 
-  return can_send_frame(SOCKET_CAN, &frame);
+  err= can_send_frame(SOCKET_CAN, &frame);
+
+  sleep(2);
+
+  return err;
 }
 
 static int check_input_mex(void *args) {
