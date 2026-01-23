@@ -54,6 +54,35 @@ static int _get_var_input(void)
   return var_id;
 }
 
+union GenericVal
+{
+  uint64_t u64;
+  int64_t i64;
+  float f32;
+  double f64;
+};
+static void _print_var_value(const enum DATA_GENERIC_TYPE type, const uint8_t size, const union GenericVal val)
+{
+  switch (type)
+  {
+    case DATA_UNSIGNED:
+      printf("%lu\n", val.u64);
+      break;
+    case DATA_SIGNED:
+      printf("%ld\n", val.i64);
+      break;
+    case DATA_FLOATED:
+      if (size==sizeof(float))
+      {
+        printf("%f\n", val.f32);
+      }else
+      {
+        printf("%f\n", val.f64);
+      }
+      break;
+  }
+}
+
 enum PRINT_INFO {
   P_BOARD,
   P_VAR,
@@ -95,19 +124,7 @@ static int _print_info(struct Cli_t* const restrict self, enum PRINT_INFO type) 
     }
 
     for (uint8_t i = 0; i < vars->var_num; i++) {
-      uint8_t size = 0;
-      switch (vars->vars[i].size)
-      {
-        case 0:
-          size = 1;
-          break;
-        case 1:
-          size = 2;
-          break;
-        case 2:
-          size = 4;
-          break;
-      }
+      uint8_t size = (uint8_t) (1u<< vars->vars[i].size);
       printf(
           "var name: %s, var id: %d, size: %d, type: %d, value: ",
           vars->vars[i].name, i,
@@ -116,8 +133,13 @@ static int _print_info(struct Cli_t* const restrict self, enum PRINT_INFO type) 
 
       if (vars->vars[i].type == DATA_FLOATED)
       {
-        float d = vars->vars[i].v_float;
-        printf("%f\n", d);
+        if (size==sizeof(float)) {
+          float d = vars->vars[i].v_f32;
+          printf("%f\n", d);
+        }else{
+          double d = vars->vars[i].v_f64;
+          printf("%lf\n", d);
+        }
       } else {
         printf("%d\n", vars->vars[i].v_u32);
       }
@@ -169,12 +191,8 @@ static int _send_req_slave(struct Cli_t* const restrict self)
         c1 = 0;
       }
       while (c1) {
-        union{
-          uint64_t u64;
-          int64_t i64;
-          float f32;
-        }value;
-        uint8_t size =0;
+        union GenericVal value ={0};
+        const uint8_t size =(uint8_t) (1 << var.size);
 
         getchar();
         printf("u: update var\n");
@@ -195,28 +213,21 @@ static int _send_req_slave(struct Cli_t* const restrict self)
             scanf("%ld", &value.i64);
             break;
           case DATA_FLOATED:
-            scanf("%f", &value.f32);
+            if (size == sizeof(float)) {
+              scanf("%f", &value.f32);
+            }else{
+              scanf("%lf", &value.f64);
+            }
             break;
           }
 
           fflush(stdin);
           fflush(stdout);
 
-          switch (var.size)
-          {
-            case 0:
-              size = 1;
-              break;
-            case 1:
-              size = 2;
-              break;
-            case 2:
-              size = 4;
-          }
-
           printf("sending b: %d\n",(uint8_t)board_id);
           printf("sending v: %d\n",(uint8_t)var_id);
-          printf("sending val: %f\n",value.f32);
+          printf("sending val:");
+          _print_var_value(var.type, size, value);
 
           if((err=dps_master_update_var(&self->m_master, (uint8_t) board_id, (uint8_t) var_id, &value, size))<0)
           {
@@ -230,13 +241,7 @@ static int _send_req_slave(struct Cli_t* const restrict self)
           sleep(2);
           dps_master_get_value_var(&self->m_master,(uint8_t) board_id, (uint8_t) var_id, &var);
           printf("%s = ", var.name);
-          if (var.type == DATA_FLOATED)
-          {
-            float d = var.v_float;
-            printf("%f\n", d);
-          } else {
-            printf("%d\n", var.v_u32);
-          }
+          _print_var_value(var.type, size, (union GenericVal){.u64=var.v_u64});
           break;
         case 'b':
           c1 = 0;
@@ -338,6 +343,10 @@ static int8_t send_mex(const DpsCanMessage* const restrict mex) {
   return err;
 }
 
+static void wait_fun(void){
+  sleep(1);
+}
+
 static int check_input_mex(void *args) {
   struct can_frame frame = {};
   DpsCanMessage mex;
@@ -376,7 +385,7 @@ int8_t cli_init(Cli_h* const self, const char* const restrict can_node,
   printf("using master id: %d\n", master_id);
   printf("using slaves id: %d\n", slaves_id);
 
-  if (dps_master_init(&p_self->m_master, master_id, slaves_id, send_mex))
+  if (dps_master_init(&p_self->m_master, master_id, slaves_id, send_mex, wait_fun))
   {
     return -2;
   }

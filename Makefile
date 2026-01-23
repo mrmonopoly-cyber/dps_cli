@@ -13,7 +13,7 @@ DPS_ROOT := $(cli_src_path)/lib/DPS
 include $(DPS_ROOT)/Makefile
 endif
 
-OBJ_LIST = dps_master.o c_vector.o dps_messages.o
+OBJ_LIST = dps_master.o c_vector.o dps_messages.o common.o
 
 all: release
 
