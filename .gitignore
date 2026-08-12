@@ -1,3 +1,6 @@
 *.o
 main
 *so
+nob.old
+nob
+compile_commands.json
